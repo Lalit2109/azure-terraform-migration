@@ -1,0 +1,153 @@
+# Azure DevOps Pipeline for Terraform Export with Matrix Strategy
+# Exports Azure resources using aztfexport in parallel per subscription
+
+trigger:
+  - main
+  - master
+
+pr: none
+
+# Schedule: Run weekly on Friday morning at 8:00 AM UTC
+schedules:
+- cron: "0 8 * * 5"
+  displayName: Weekly Terraform Export (Friday Morning)
+  branches:
+    include:
+    - main
+    - master
+  always: true
+
+parameters:
+- name: subscriptionIds
+  displayName: 'Subscription IDs (comma-separated, optional)'
+  type: string
+  default: ''
+- name: allSubscriptions
+  displayName: 'Export all subscriptions'
+  type: boolean
+  default: true
+
+variables:
+  - group: 'TerraformExport'
+  - name: configPath
+    value: 'pipelines/subscriptions.yaml'
+  - name: outputDir
+    value: '$(Pipeline.Workspace)/exports'
+  - name: gitBranch
+    value: 'main'
+  - name: pushToRepos
+    value: 'true'
+
+stages:
+- stage: DiscoverSubscriptions
+  displayName: 'Discover Subscriptions'
+  pool:
+    vmImage: 'ubuntu-latest'
+  jobs:
+  - job: DiscoverJob
+    displayName: 'Build Subscription Matrix'
+    steps:
+    - task: UsePythonVersion@0
+      displayName: 'Setup Python'
+      inputs:
+        versionSpec: '3.10'
+        addToPath: true
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: 'Install Python dependencies'
+
+    - task: AzureCLI@2
+      displayName: 'Discover Subscriptions'
+      inputs:
+        azureSubscription: '$(defaultServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Discovering subscriptions..."
+          python src/discover_subscriptions.py \
+            --config "$(configPath)" \
+            --subscription-ids "${{ parameters.subscriptionIds }}" \
+            --all-subscriptions ${{ parameters.allSubscriptions }} \
+            --output "$(Pipeline.Workspace)/subscription_matrix.json"
+          
+          echo "Matrix file created"
+          cat "$(Pipeline.Workspace)/subscription_matrix.json"
+      name: discover
+
+    - task: PowerShell@2
+      displayName: 'Set Matrix Variable'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $matrixJson = Get-Content "$(Pipeline.Workspace)/subscription_matrix.json" -Raw
+          $matrix = $matrixJson | ConvertFrom-Json
+          $count = ($matrix.PSObject.Properties | Measure-Object).Count
+          Write-Host "Matrix contains $count subscription(s)"
+          
+          # Convert to Azure DevOps matrix format (as JSON string)
+          $matrixOutput = @{}
+          foreach ($key in $matrix.PSObject.Properties.Name) {
+            $entry = $matrix.$key
+            $matrixOutput[$key] = @{
+              subscriptionId = $entry.subscriptionId
+              subscriptionName = $entry.subscriptionName
+              serviceConnection = $entry.serviceConnection
+            }
+          }
+          
+          # Output as escaped JSON for Azure DevOps
+          $matrixJsonOutput = $matrixOutput | ConvertTo-Json -Compress -Depth 10
+          $matrixJsonEscaped = $matrixJsonOutput -replace '"', '\"'
+          Write-Host "Setting matrix variable..."
+          Write-Host "##vso[task.setvariable variable=subscriptionMatrix;isOutput=true]$matrixJsonEscaped"
+          Write-Host "Matrix variable set successfully"
+      name: setMatrix
+      env:
+        SYSTEM_ACCESS_TOKEN: $(System.AccessToken)
+
+- stage: ExportSubscriptions
+  displayName: 'Export Subscriptions (Matrix)'
+  dependsOn: DiscoverSubscriptions
+  pool:
+    vmImage: 'ubuntu-latest'
+  jobs:
+  - job: ExportMatrix
+    displayName: 'Export Subscriptions in Parallel'
+    strategy:
+      matrix: $[ stageDependencies.DiscoverSubscriptions.DiscoverJob.outputs['setMatrix.subscriptionMatrix'] ]
+      maxParallel: 10
+    variables:
+      subscriptionId: $(subscriptionId)
+      subscriptionName: $(subscriptionName)
+      serviceConnection: $(serviceConnection)
+    steps:
+    - template: pipelines/templates/export-subscription.yml
+      parameters:
+        subscriptionId: $(subscriptionId)
+        subscriptionName: $(subscriptionName)
+        serviceConnection: $(serviceConnection)
+        configPath: $(configPath)
+        outputDir: $(outputDir)
+        gitBranch: $(gitBranch)
+        pushToRepos: $(pushToRepos)
+
+- stage: PublishResults
+  displayName: 'Publish Export Results'
+  dependsOn: ExportSubscriptions
+  condition: always()
+  pool:
+    vmImage: 'ubuntu-latest'
+  jobs:
+  - job: AggregateResults
+    displayName: 'Aggregate and Publish Results'
+    steps:
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Export Results'
+      inputs:
+        pathToPublish: '$(outputDir)'
+        artifactName: 'terraform-exports'
+        publishLocation: 'Container'
+      condition: always()
+

@@ -1,0 +1,83 @@
+# Azure Subscriptions Configuration
+
+# Service Principal (SPN) / Service Connection Mapping
+# Each subscription can have its own SPN with least-privilege access
+subscription_spn_map:
+  # Map subscriptions by ID or name to service connection names
+  # Example:
+  # "subscription-id-1": "spn-conn-sub1"
+  # "Production Subscription": "prod-azure-connection"
+
+# Default service connection (fallback if subscription not in map)
+default_spn: "$(defaultServiceConnection)"
+# Alternative name (for backward compatibility)
+default_service_connection: "$(defaultServiceConnection)"
+
+# Exclude subscriptions from export (all others are exported)
+# Can exclude by subscription ID or subscription name
+exclude_subscriptions:
+  prod: []
+    # - "subscription-id-prod-1"  # Exclude by ID
+    # - "Production Subscription Name"  # Exclude by name
+  non-prod: []
+    # - "subscription-id-non-prod-1"  # Exclude by ID
+    # - "Development Subscription Name"  # Exclude by name
+
+# Global resource group exclusions (wildcards supported: *, ?)
+global_excludes:
+  resource_groups:
+    - "Built-in-identity-rg"
+    - "networkwatcherRG"
+    - "NetworkWatcherRG_*"
+    - "AzureBackupRG_*"
+    - "AzureSiteRecoveryRG_*"
+    - "MC_*"
+    - "azure-arc"
+    - "DefaultResourceGroup-*"
+
+# Logging (DEBUG, INFO, ERROR) - can override via LOG_LEVEL env var
+logging:
+  level: INFO
+
+# Subscriptions are auto-discovered from Azure CLI (no manual list needed)
+
+# aztfexport configuration
+aztfexport:
+  # Resource types to export (empty = all)
+  resource_types: []
+  
+  # Resource groups to exclude (in addition to global_excludes)
+  exclude_resource_groups: []
+  
+  # Resources to exclude by full ID
+  exclude_resources: []
+  
+  # Resource types to exclude (uses Resource Graph query mode)
+  exclude_resource_types: []
+  
+  # Custom Resource Graph query (overrides exclude_resource_types if set)
+  query: null
+  
+  # Additional aztfexport flags
+  additional_flags: []
+
+# Azure DevOps configuration
+azure_devops:
+  organization: "your-org"
+  project: "your-project"
+
+# Git configuration
+git:
+  # Push to repos (can override via PUSH_TO_REPOS env var)
+  push_to_repos: false
+  branch: "main"
+  # Number of recent backup branches (runs) to keep (default: 10)
+  backup_retention_count: 10
+
+# Output configuration
+output:
+  base_dir: "./exports"
+  # Create resource group subfolders (true) or flat subscription folder (false)
+  create_rg_folders: true
+  # Clean up export directory after successful git push (saves disk space)
+  cleanup_after_push: true
