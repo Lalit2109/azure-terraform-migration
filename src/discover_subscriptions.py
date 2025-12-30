@@ -157,6 +157,13 @@ def build_matrix(
         # Get SPN mapping
         service_connection = get_spn_mapping(sub_id, sub_name, config)
         
+        # Ensure service connection is resolved (not a pipeline variable reference)
+        # If it still contains $(variableName), it means resolution failed
+        if service_connection.startswith('$(') and service_connection.endswith(')'):
+            print(f"Warning: Service connection for {sub_name} not resolved: {service_connection}", file=sys.stderr)
+            print(f"  This will cause Azure DevOps validation errors.", file=sys.stderr)
+            print(f"  Ensure defaultServiceConnection environment variable is set.", file=sys.stderr)
+        
         matrix[matrix_key] = {
             'subscriptionId': sub_id,
             'subscriptionName': sub_name,
