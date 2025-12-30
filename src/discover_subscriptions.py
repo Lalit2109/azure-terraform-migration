@@ -55,6 +55,24 @@ def load_config(config_path: str) -> Dict[str, Any]:
         return {}
 
 
+def resolve_pipeline_variable(value: str) -> str:
+    """Resolve Azure DevOps pipeline variable syntax $(variableName) from environment"""
+    if not value:
+        return value
+    
+    # Check if it's a pipeline variable syntax: $(variableName)
+    if value.startswith('$(') and value.endswith(')'):
+        var_name = value[2:-1]  # Extract variable name without $( and )
+        # Try to resolve from environment variable
+        env_value = os.getenv(var_name)
+        if env_value:
+            return env_value
+        # If not found, return as-is for Azure DevOps to resolve later
+        return value
+    
+    return value
+
+
 def get_spn_mapping(subscription_id: str, subscription_name: str, config: Dict[str, Any]) -> str:
     """Get service connection for subscription with fallback to default"""
     spn_map = config.get('subscription_spn_map', {})
@@ -62,15 +80,17 @@ def get_spn_mapping(subscription_id: str, subscription_name: str, config: Dict[s
     
     # Check by subscription ID
     if subscription_id in spn_map:
-        return spn_map[subscription_id]
+        return resolve_pipeline_variable(spn_map[subscription_id])
     
     # Check by subscription name
     if subscription_name in spn_map:
-        return spn_map[subscription_name]
+        return resolve_pipeline_variable(spn_map[subscription_name])
     
     # Fallback to default
     if default_spn:
-        return default_spn
+        resolved = resolve_pipeline_variable(default_spn)
+        if resolved:
+            return resolved
     
     # Last resort: use variable from pipeline
     return os.getenv('defaultServiceConnection', '$(defaultServiceConnection)')

@@ -118,10 +118,6 @@ stages:
     strategy:
       matrix: $[ stageDependencies.DiscoverSubscriptions.DiscoverJob.outputs['setMatrix.subscriptionMatrix'] ]
       maxParallel: 10
-    variables:
-      subscriptionId: $(subscriptionId)
-      subscriptionName: $(subscriptionName)
-      serviceConnection: $(serviceConnection)
     steps:
     - template: pipelines/templates/export-subscription.yml
       parameters:
