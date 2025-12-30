@@ -8,6 +8,9 @@ parameters:
   type: string
 - name: serviceConnection
   type: string
+  # Note: serviceConnection is passed but not used for task authentication
+  # Azure DevOps validates service connections at parse time, so we use defaultServiceConnection
+  # The serviceConnection parameter is kept for logging/reference purposes
 - name: configPath
   type: string
   default: 'pipelines/subscriptions.yaml'
@@ -54,15 +57,19 @@ steps:
 - task: AzureCLI@2
   displayName: 'Export Subscription: ${{ parameters.subscriptionName }}'
   inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
+    azureSubscription: '$(defaultServiceConnection)'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
       echo "=========================================="
       echo "Exporting Subscription: ${{ parameters.subscriptionName }}"
       echo "Subscription ID: ${{ parameters.subscriptionId }}"
-      echo "Service Connection: ${{ parameters.serviceConnection }}"
+      echo "Service Connection: $(serviceConnection)"
       echo "=========================================="
+      
+      # Note: Using defaultServiceConnection for task authentication
+      # The actual subscription access is controlled by the service connection's permissions
+      # If per-subscription SPN is needed, authentication would need to be done manually
       
       # Verify authentication
       az account show

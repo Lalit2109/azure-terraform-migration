@@ -127,11 +127,12 @@ stages:
       parameters:
         subscriptionId: $(subscriptionId)
         subscriptionName: $(subscriptionName)
-        serviceConnection: '$(serviceConnection)'
+        serviceConnection: $(serviceConnection)
         configPath: $(configPath)
         outputDir: $(outputDir)
         gitBranch: $(gitBranch)
         pushToRepos: $(pushToRepos)
+      continueOnError: false
 
 - stage: PublishResults
   displayName: 'Publish Export Results'
