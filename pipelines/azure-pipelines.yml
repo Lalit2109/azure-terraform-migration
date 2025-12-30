@@ -90,7 +90,9 @@ stages:
           $count = ($matrix.PSObject.Properties | Measure-Object).Count
           Write-Host "Matrix contains $count subscription(s)"
           
-          # Convert to Azure DevOps matrix format (as JSON string)
+          # Convert to Azure DevOps matrix format
+          # Azure DevOps expects a hashtable where each key is a matrix entry
+          # and the value is another hashtable with the variables
           $matrixOutput = @{}
           foreach ($key in $matrix.PSObject.Properties.Name) {
             $entry = $matrix.$key
@@ -101,11 +103,13 @@ stages:
             }
           }
           
-          # Output as escaped JSON for Azure DevOps
-          $matrixJsonOutput = $matrixOutput | ConvertTo-Json -Compress -Depth 10
-          $matrixJsonEscaped = $matrixJsonOutput -replace '"', '\"'
-          Write-Host "Setting matrix variable..."
-          Write-Host "##vso[task.setvariable variable=subscriptionMatrix;isOutput=true]$matrixJsonEscaped"
+          # Convert to JSON string (not escaped - Azure DevOps will handle it)
+          $matrixJsonOutput = $matrixOutput | ConvertTo-Json -Depth 10
+          Write-Host "Matrix JSON:"
+          Write-Host $matrixJsonOutput
+          
+          # Set as output variable (Azure DevOps will parse the JSON)
+          Write-Host "##vso[task.setvariable variable=subscriptionMatrix;isOutput=true]$matrixJsonOutput"
           Write-Host "Matrix variable set successfully"
       name: setMatrix
       env:
