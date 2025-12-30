@@ -103,14 +103,21 @@ stages:
             }
           }
           
-          # Convert to JSON string (not escaped - Azure DevOps will handle it)
-          $matrixJsonOutput = $matrixOutput | ConvertTo-Json -Depth 10
-          Write-Host "Matrix JSON:"
-          Write-Host $matrixJsonOutput
+          # Convert to JSON string (compressed, single line for Azure DevOps)
+          $matrixJsonOutput = $matrixOutput | ConvertTo-Json -Compress -Depth 10
+          
+          # Debug: Show matrix structure (first entry only)
+          $firstKey = ($matrixOutput.Keys | Select-Object -First 1)
+          if ($firstKey) {
+            Write-Host "Sample matrix entry: $firstKey"
+            Write-Host "  subscriptionId: $($matrixOutput[$firstKey].subscriptionId)"
+            Write-Host "  subscriptionName: $($matrixOutput[$firstKey].subscriptionName)"
+            Write-Host "  serviceConnection: $($matrixOutput[$firstKey].serviceConnection)"
+          }
           
           # Set as output variable (Azure DevOps will parse the JSON)
           Write-Host "##vso[task.setvariable variable=subscriptionMatrix;isOutput=true]$matrixJsonOutput"
-          Write-Host "Matrix variable set successfully"
+          Write-Host "Matrix variable set successfully ($count entries)"
       name: setMatrix
       env:
         SYSTEM_ACCESS_TOKEN: $(System.AccessToken)
