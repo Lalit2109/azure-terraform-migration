@@ -75,24 +75,32 @@ def resolve_pipeline_variable(value: str) -> str:
 
 def get_spn_mapping(subscription_id: str, subscription_name: str, config: Dict[str, Any]) -> str:
     """Get service connection for subscription with fallback to default"""
-    spn_map = config.get('subscription_spn_map', {})
+    spn_map = config.get('subscription_spn_map') or {}
     default_spn = config.get('default_spn') or config.get('default_service_connection')
     
     # Check by subscription ID
-    if subscription_id in spn_map:
+    if spn_map and subscription_id in spn_map:
         mapped_value = spn_map[subscription_id]
-        resolved = resolve_pipeline_variable(mapped_value)
-        if resolved and not resolved.startswith('$('):
-            return resolved
-        return mapped_value
+        if mapped_value:  # Only use if not empty
+            resolved = resolve_pipeline_variable(mapped_value)
+            if resolved and not resolved.startswith('$('):
+                return resolved
+            # If still has $(variableName), try to resolve from env, otherwise return as-is
+            if resolved:
+                return resolved
+            return mapped_value
     
     # Check by subscription name
-    if subscription_name in spn_map:
+    if spn_map and subscription_name in spn_map:
         mapped_value = spn_map[subscription_name]
-        resolved = resolve_pipeline_variable(mapped_value)
-        if resolved and not resolved.startswith('$('):
-            return resolved
-        return mapped_value
+        if mapped_value:  # Only use if not empty
+            resolved = resolve_pipeline_variable(mapped_value)
+            if resolved and not resolved.startswith('$('):
+                return resolved
+            # If still has $(variableName), try to resolve from env, otherwise return as-is
+            if resolved:
+                return resolved
+            return mapped_value
     
     # Fallback to default
     if default_spn:
