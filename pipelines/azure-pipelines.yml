@@ -66,6 +66,8 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           echo "Discovering subscriptions..."
+          # Export defaultServiceConnection as environment variable for Python script to resolve
+          export defaultServiceConnection="$(defaultServiceConnection)"
           python src/discover_subscriptions.py \
             --config "$(configPath)" \
             --subscription-ids "${{ parameters.subscriptionIds }}" \
@@ -75,6 +77,8 @@ stages:
           echo "Matrix file created"
           cat "$(Pipeline.Workspace)/subscription_matrix.json"
       name: discover
+      env:
+        defaultServiceConnection: $(defaultServiceConnection)
 
     - task: PowerShell@2
       displayName: 'Set Matrix Variable'

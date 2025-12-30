@@ -54,7 +54,7 @@ steps:
 - task: AzureCLI@2
   displayName: 'Export Subscription: ${{ parameters.subscriptionName }}'
   inputs:
-    azureSubscription: '${{ parameters.serviceConnection }}'
+    azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |

@@ -80,20 +80,34 @@ def get_spn_mapping(subscription_id: str, subscription_name: str, config: Dict[s
     
     # Check by subscription ID
     if subscription_id in spn_map:
-        return resolve_pipeline_variable(spn_map[subscription_id])
+        mapped_value = spn_map[subscription_id]
+        resolved = resolve_pipeline_variable(mapped_value)
+        if resolved and not resolved.startswith('$('):
+            return resolved
+        return mapped_value
     
     # Check by subscription name
     if subscription_name in spn_map:
-        return resolve_pipeline_variable(spn_map[subscription_name])
+        mapped_value = spn_map[subscription_name]
+        resolved = resolve_pipeline_variable(mapped_value)
+        if resolved and not resolved.startswith('$('):
+            return resolved
+        return mapped_value
     
     # Fallback to default
     if default_spn:
         resolved = resolve_pipeline_variable(default_spn)
-        if resolved:
+        # If resolved from env var, use it; otherwise keep the pipeline variable syntax
+        if resolved and not resolved.startswith('$('):
             return resolved
+        # Return the literal value (which may be $(defaultServiceConnection))
+        return default_spn
     
     # Last resort: use variable from pipeline
-    return os.getenv('defaultServiceConnection', '$(defaultServiceConnection)')
+    env_value = os.getenv('defaultServiceConnection')
+    if env_value:
+        return env_value
+    return '$(defaultServiceConnection)'
 
 
 def should_exclude_subscription(subscription_id: str, subscription_name: str, config: Dict[str, Any]) -> bool:
